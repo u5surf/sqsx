@@ -2,6 +2,12 @@ package sqsx
 
 import (
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"time"
+)
+
+const (
+	SQSMaxBatchSize   = 10
+	SQSMaxPollTimeout = time.Second * 20
 )
 
 type Service interface {

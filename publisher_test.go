@@ -79,7 +79,7 @@ func (m mockPubImpl) publishBatch(input []*envelope) {
 	if m.publishBatchFn != nil {
 		m.publishBatchFn(input)
 	}
-	m.Publisher.(*pubImpl).publishBatch(input)
+	m.Publisher.(*publisher).publishBatch(input)
 }
 
 func TestNewPublisher(t *testing.T) {
@@ -87,7 +87,7 @@ func TestNewPublisher(t *testing.T) {
 		svc := &mockService{}
 		p, err := NewPublisher("QUEUE_NAME", svc)
 		if assert.NoError(t, err) {
-			impl := p.(*pubImpl)
+			impl := p.(*publisher)
 			assert.Equal(t, "QUEUE_NAME", impl.queueName)
 			assert.Equal(t, "QUEUE_URL", impl.queueURL)
 			assert.NotNil(t, impl.stop)
@@ -125,7 +125,7 @@ func TestNewPublisher(t *testing.T) {
 		svc := &mockService{}
 		c := PublisherConfig{BatchWindow: time.Second}
 		p, err := NewPublisher("QUEUE_NAME", svc, &c)
-		impl := p.(*pubImpl)
+		impl := p.(*publisher)
 		if assert.NoError(t, err) {
 			if assert.NotNil(t, impl.config) {
 				assert.Equal(t, time.Second, impl.config.BatchWindow)
@@ -138,7 +138,7 @@ func TestNewPublisher(t *testing.T) {
 		c := PublisherConfig{BatchWindow: time.Second}
 		c2 := PublisherConfig{BatchWindow: time.Millisecond}
 		p, err := NewPublisher("QUEUE_NAME", svc, &c, nil, &c2)
-		impl := p.(*pubImpl)
+		impl := p.(*publisher)
 		if assert.NoError(t, err) {
 			if assert.NotNil(t, impl.config) {
 				assert.Equal(t, time.Millisecond, impl.config.BatchWindow)
@@ -150,7 +150,7 @@ func TestNewPublisher(t *testing.T) {
 func TestPubImpl_Stop(t *testing.T) {
 	svc := &mockService{}
 	p, _ := NewPublisher("QUEUE_NAME", svc)
-	impl := p.(*pubImpl)
+	impl := p.(*publisher)
 	go func() {
 		select {
 		case w := <-impl.stop:
@@ -167,7 +167,7 @@ func TestPubImpl_Start(t *testing.T) {
 
 		c := 0
 		done := make(chan bool)
-		impl := p.(*pubImpl)
+		impl := p.(*publisher)
 		impl.publishBatchFn = func(input []*envelope) {
 			t.Logf("publishBatchFn: %d messages", len(input))
 			switch c {
@@ -193,7 +193,7 @@ func TestPubImpl_Start(t *testing.T) {
 
 		c := 0
 		done := make(chan bool)
-		impl := p.(*pubImpl)
+		impl := p.(*publisher)
 		impl.publishBatchFn = func(input []*envelope) {
 			t.Logf("publishBatchFn: %d messages", len(input))
 			switch c {
@@ -218,7 +218,7 @@ func TestPubImpl_Start(t *testing.T) {
 		p, _ := NewPublisher("QUEUE_NAME", svc, &PublisherConfig{BatchWindow: time.Second * 100})
 
 		c := 0
-		impl := p.(*pubImpl)
+		impl := p.(*publisher)
 		impl.publishBatchFn = func(input []*envelope) {
 			t.Logf("publishBatchFn: %d messages", len(input))
 			switch c {
@@ -244,7 +244,7 @@ func TestPubImpl_Start(t *testing.T) {
 		p, _ := NewPublisher("QUEUE_NAME", svc, &PublisherConfig{BatchWindow: time.Second})
 
 		c := 0
-		impl := p.(*pubImpl)
+		impl := p.(*publisher)
 		done := make(chan bool)
 		impl.publishBatchFn = func(input []*envelope) {
 			switch c {
@@ -282,7 +282,7 @@ func TestPubImpl_Publish(t *testing.T) {
 	t.Run("ErrInvalidMessage", func(t *testing.T) {
 		svc := &mockService{}
 		p, _ := NewPublisher("QUEUE_NAME", svc, &PublisherConfig{BatchWindow: time.Second * 100})
-		impl := p.(*pubImpl)
+		impl := p.(*publisher)
 		err := impl.Publish(nil)
 		if assert.Error(t, err) {
 			assert.Equal(t, ErrInvalidMessage, err)
@@ -292,7 +292,7 @@ func TestPubImpl_Publish(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
 		svc := &mockService{}
 		p, _ := NewPublisher("QUEUE_NAME", svc, &PublisherConfig{BatchWindow: time.Second * 100})
-		impl := p.(*pubImpl)
+		impl := p.(*publisher)
 		done := make(chan bool)
 		go func() {
 			err := impl.Publish("test", &MessageConfig{Delay: time.Second})
@@ -313,7 +313,7 @@ func TestPubImpl_Publish(t *testing.T) {
 	t.Run("Error", func(t *testing.T) {
 		svc := &mockService{}
 		p, _ := NewPublisher("QUEUE_NAME", svc, &PublisherConfig{BatchWindow: time.Second * 100})
-		impl := p.(*pubImpl)
+		impl := p.(*publisher)
 		done := make(chan bool)
 		go func() {
 			err := impl.Publish("test", &MessageConfig{Delay: time.Second})
@@ -328,7 +328,7 @@ func TestPubImpl_Publish(t *testing.T) {
 	t.Run("NilConfig", func(t *testing.T) {
 		svc := &mockService{}
 		p, _ := NewPublisher("QUEUE_NAME", svc, &PublisherConfig{BatchWindow: time.Second * 100})
-		impl := p.(*pubImpl)
+		impl := p.(*publisher)
 		done := make(chan bool)
 		go func() {
 			err := impl.Publish("test", nil)
@@ -382,7 +382,7 @@ func TestPubImpl_publishBatch(t *testing.T) {
 				m:      Message{Data: "m3"},
 			},
 		}
-		go p.(*pubImpl).publishBatch(ee)
+		go p.(*publisher).publishBatch(ee)
 		c := 0
 		deadline := time.NewTicker(time.Millisecond * 100)
 		for {
@@ -425,7 +425,7 @@ func TestPubImpl_publishBatch(t *testing.T) {
 				m:      Message{Data: "m3"},
 			},
 		}
-		go p.(*pubImpl).publishBatch(ee)
+		go p.(*publisher).publishBatch(ee)
 		c := 0
 		deadline := time.NewTicker(time.Millisecond * 100)
 		for {
@@ -469,7 +469,7 @@ func TestPubImpl_publishBatch(t *testing.T) {
 				m:      Message{Data: "m3"},
 			},
 		}
-		impl := p.(*pubImpl)
+		impl := p.(*publisher)
 		impl.jsonMarshalFn = func(v interface{}) ([]byte, error) {
 			return nil, errors.New("json error")
 		}

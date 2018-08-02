@@ -10,14 +10,20 @@ import (
 	"time"
 )
 
-const (
-	sqsMaxBatchSize = 10
-)
-
 var (
 	ErrInvalidMessage    = errors.New("invalid message")
 	ErrQueueDoesNotExist = errors.New("queue does not exist")
 )
+
+type PublisherConfig struct {
+	// Publish compatible configuration fields.
+	BatchWindow time.Duration
+}
+
+type MessageConfig struct {
+	// Service delay time for message in seconds.
+	Delay time.Duration
+}
 
 type Publisher interface {
 	Stop()
@@ -37,7 +43,7 @@ type envelope struct {
 	delay  time.Duration
 }
 
-type pubImpl struct {
+type publisher struct {
 	queueName, queueURL string
 	config              *PublisherConfig
 	svc                 Service
@@ -49,17 +55,17 @@ type pubImpl struct {
 	jsonMarshalFn  func(v interface{}) ([]byte, error)
 }
 
-func (p pubImpl) Stop() {
+func (p publisher) Stop() {
 	wait := make(chan bool)
 	p.stop <- wait
 	<-wait
 }
 
-func (p pubImpl) Start() {
+func (p publisher) Start() {
 	tout := time.NewTicker(p.config.BatchWindow)
 	var ee []*envelope
 	for {
-		if len(ee) == sqsMaxBatchSize {
+		if len(ee) == SQSMaxBatchSize {
 			p.publishBatchFn(ee)
 			ee = nil
 		}
@@ -84,7 +90,7 @@ func (p pubImpl) Start() {
 	}
 }
 
-func (p pubImpl) publishBatch(ee []*envelope) {
+func (p publisher) publishBatch(ee []*envelope) {
 	var (
 		bee    []*sqs.SendMessageBatchRequestEntry
 		envMap map[string]*envelope
@@ -135,7 +141,7 @@ func (p pubImpl) publishBatch(ee []*envelope) {
 	}
 }
 
-func (p pubImpl) Publish(msg interface{}, config ...*MessageConfig) error {
+func (p publisher) Publish(msg interface{}, config ...*MessageConfig) error {
 	if msg == nil {
 		return ErrInvalidMessage
 	}
@@ -163,7 +169,7 @@ func NewPublisher(queueName string, svc Service, config ...*PublisherConfig) (Pu
 		return nil, errorf(err, "could not get outbox URL")
 	}
 
-	p := &pubImpl{
+	p := &publisher{
 		queueName: queueName,
 		queueURL:  aws.StringValue(resp.QueueUrl),
 		svc:       svc,
