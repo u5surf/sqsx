@@ -4,6 +4,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"log"
 	"sync/atomic"
 	"time"
 )
@@ -46,13 +47,14 @@ func (c consumer) Start(handler interface{}) error {
 			if maxMessages == 0 {
 				continue
 			}
+			log.Println(maxMessages)
 			if SQSMaxBatchSize < maxMessages {
 				maxMessages = SQSMaxBatchSize
 			}
 
 			result, err := c.svc.ReceiveMessage(&sqs.ReceiveMessageInput{
 				QueueUrl:            aws.String(c.queueURL),
-				MaxNumberOfMessages: aws.Int64(int64(free)),
+				MaxNumberOfMessages: aws.Int64(int64(maxMessages)),
 				WaitTimeSeconds:     aws.Int64(int64(c.config.PollTimeout.Seconds())),
 			})
 			if err != nil {
@@ -78,7 +80,9 @@ func (c consumer) consume(m *sqs.Message, handler interface{}) error {
 }
 
 func (c consumer) Stop() {
-	panic("implement me")
+	done := make(chan bool)
+	c.stop <- done
+	<-done
 }
 
 func NewConsumer(queueName string, svc Service, config ...*ConsumerConfig) (Consumer, error) {
