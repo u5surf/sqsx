@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+type ConsumeHandler interface {
+	Handle(message *sqs.Message, deadline ExtendDeadline) error
+	Error(message *sqs.Message, ok bool, err error)
+}
+
+type ExtendDeadline func(message *sqs.Message, receiptHandle string, timeout time.Duration) error
+
 type ConsumerConfig struct {
 	MaxWorkers int
 
@@ -15,7 +22,7 @@ type ConsumerConfig struct {
 }
 
 type Consumer interface {
-	Start(handler interface{}) error
+	Start(handler ConsumeHandler) error
 	Stop()
 }
 
@@ -25,13 +32,14 @@ type consumer struct {
 	svc                 Service
 	stop                chan chan bool
 
-	consumeFn     func(m *sqs.Message, handler interface{}) error
-	deleteMessage func(m *sqs.Message)
+	consumeFn        func(m *sqs.Message, handler ConsumeHandler)
+	extendDeadlineFn ExtendDeadline
 }
 
-func (c consumer) Start(handler interface{}) error {
+func (c consumer) Start(handler ConsumeHandler) error {
 	var stopped chan bool
 	free := int32(c.config.MaxWorkers)
+
 	for {
 		select {
 		case stopped = <-c.stop:
@@ -65,7 +73,6 @@ func (c consumer) Start(handler interface{}) error {
 			for _, m := range result.Messages {
 				atomic.AddInt32(&free, -1)
 				go func(m *sqs.Message) {
-					// TODO: consume
 					c.consumeFn(m, handler)
 					atomic.AddInt32(&free, 1)
 				}(m)
@@ -74,7 +81,36 @@ func (c consumer) Start(handler interface{}) error {
 	}
 }
 
-func (c consumer) consume(m *sqs.Message, handler interface{}) error {
+func (c consumer) consume(m *sqs.Message, handler ConsumeHandler) {
+	// Handle message
+	if err := handler.Handle(m, c.extendDeadlineFn); err != nil {
+		handler.Error(m, false, err)
+		return
+	}
+
+	// Delete message from SQS
+	inp := &sqs.DeleteMessageInput{
+		QueueUrl:      aws.String(c.queueURL),
+		ReceiptHandle: m.ReceiptHandle,
+	}
+	if _, err := c.svc.DeleteMessage(inp); err != nil {
+		// The message was processed but we couldn't
+		// delete the message from queue.
+		handler.Error(m, true, err)
+		return
+	}
+}
+
+func (c consumer) extendDeadline(message *sqs.Message, receiptHandle string, timeout time.Duration) error {
+	inp := &sqs.ChangeMessageVisibilityInput{
+		ReceiptHandle:     aws.String(receiptHandle),
+		QueueUrl:          aws.String(c.queueURL),
+		VisibilityTimeout: aws.Int64(int64(timeout.Seconds())),
+	}
+	_, err := c.svc.ChangeMessageVisibility(inp)
+	if err != nil {
+		return errorf(err, "could not extend deadline for message %q", aws.StringValue(message.MessageId))
+	}
 	return nil
 }
 
@@ -115,5 +151,6 @@ func NewConsumer(queueName string, svc Service, config ...*ConsumerConfig) (Cons
 		}
 	}
 	c.consumeFn = c.consume
+	c.extendDeadlineFn = c.extendDeadline
 	return c, nil
 }

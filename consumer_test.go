@@ -11,6 +11,24 @@ import (
 	"time"
 )
 
+type mockHandler struct {
+	handle func(message *sqs.Message, deadline ExtendDeadline) error
+	error  func(*sqs.Message, bool, error)
+}
+
+func (m *mockHandler) Handle(message *sqs.Message, deadline ExtendDeadline) error {
+	if m.handle != nil {
+		return m.handle(message, deadline)
+	}
+	return nil
+}
+
+func (m *mockHandler) Error(message *sqs.Message, ok bool, err error) {
+	if m.error != nil {
+		m.error(message, ok, err)
+	}
+}
+
 func TestNewConsumer(t *testing.T) {
 	t.Run("New", func(t *testing.T) {
 		svc := &mockService{}
@@ -22,6 +40,8 @@ func TestNewConsumer(t *testing.T) {
 			assert.NotNil(t, impl.stop)
 			assert.NotNil(t, impl.svc)
 			assert.NotNil(t, impl.svc)
+			assert.NotNil(t, impl.consumeFn)
+			assert.NotNil(t, impl.extendDeadlineFn)
 			if assert.NotNil(t, impl.config) {
 				assert.Equal(t, SQSMaxPollTimeout, impl.config.PollTimeout)
 			}
@@ -96,9 +116,8 @@ func TestConsumer_Start(t *testing.T) {
 		}
 		consumeCount := 0
 		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{PollTimeout: pollTimeout})
-		con.(*consumer).consumeFn = func(m *sqs.Message, handler interface{}) error {
+		con.(*consumer).consumeFn = func(m *sqs.Message, handler ConsumeHandler) {
 			consumeCount++
-			return nil
 		}
 		go con.Start(nil)
 		<-time.NewTimer(time.Second).C
@@ -125,9 +144,8 @@ func TestConsumer_Start(t *testing.T) {
 		}
 		consumeCount := 0
 		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{PollTimeout: pollTimeout})
-		con.(*consumer).consumeFn = func(m *sqs.Message, handler interface{}) error {
+		con.(*consumer).consumeFn = func(m *sqs.Message, handler ConsumeHandler) {
 			consumeCount++
-			return nil
 		}
 		go con.Start(nil)
 		<-time.NewTimer(time.Second).C
@@ -175,7 +193,7 @@ func TestConsumer_Start(t *testing.T) {
 		}
 		consumeCount := int32(0)
 		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{MaxWorkers: 2, PollTimeout: pollTimeout})
-		con.(*consumer).consumeFn = func(m *sqs.Message, handler interface{}) error {
+		con.(*consumer).consumeFn = func(m *sqs.Message, handler ConsumeHandler) {
 			switch aws.StringValue(m.MessageId) {
 			case "msg_0":
 				<-time.NewTimer(time.Millisecond * 1000).C
@@ -185,7 +203,6 @@ func TestConsumer_Start(t *testing.T) {
 				<-time.NewTimer(time.Second).C
 			}
 			atomic.AddInt32(&consumeCount, 1)
-			return nil
 		}
 		go con.Start(nil)
 		<-time.NewTimer(time.Second * 4).C
@@ -279,7 +296,7 @@ func TestConsumer_Start(t *testing.T) {
 		}
 		consumeCount := int32(0)
 		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{MaxWorkers: 2, PollTimeout: pollTimeout})
-		con.(*consumer).consumeFn = func(m *sqs.Message, handler interface{}) error {
+		con.(*consumer).consumeFn = func(m *sqs.Message, handler ConsumeHandler) {
 			switch aws.StringValue(m.MessageId) {
 			case "msg_0":
 				<-time.NewTimer(time.Millisecond * 1000).C
@@ -289,7 +306,6 @@ func TestConsumer_Start(t *testing.T) {
 				t.Error("")
 			}
 			atomic.AddInt32(&consumeCount, 1)
-			return nil
 		}
 		go con.Start(nil)
 		<-time.NewTimer(time.Millisecond * 300).C
@@ -340,7 +356,7 @@ func TestConsumer_Start(t *testing.T) {
 		}
 		consumeCount := int32(0)
 		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{MaxWorkers: 2, PollTimeout: pollTimeout})
-		con.(*consumer).consumeFn = func(m *sqs.Message, handler interface{}) error {
+		con.(*consumer).consumeFn = func(m *sqs.Message, handler ConsumeHandler) {
 			switch aws.StringValue(m.MessageId) {
 			case "msg_0":
 				<-time.NewTimer(time.Millisecond * 1000).C
@@ -350,7 +366,6 @@ func TestConsumer_Start(t *testing.T) {
 				<-time.NewTimer(time.Millisecond * 500).C
 			}
 			atomic.AddInt32(&consumeCount, 1)
-			return nil
 		}
 		go con.Start(nil)
 		<-time.NewTimer(time.Millisecond * 700).C
@@ -361,5 +376,105 @@ func TestConsumer_Start(t *testing.T) {
 		// In this test case, we except all three messages to be consumed
 		assert.Equal(t, int32(3), consumeCount)
 	})
+}
 
+func TestConsumer_consume(t *testing.T) {
+
+	t.Run("Success", func(t *testing.T) {
+		svc := &mockService{
+			deleteMessage: func(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
+				return &sqs.DeleteMessageOutput{}, nil
+			},
+		}
+		c := &consumer{svc: svc}
+		m := &sqs.Message{
+			Body: aws.String(string("test")),
+		}
+		handler := &mockHandler{
+			handle: func(message *sqs.Message, deadline ExtendDeadline) error {
+				return nil
+			},
+			error: func(message *sqs.Message, b bool, e error) {
+				t.Error("error handler should not be called for this test")
+			},
+		}
+		c.consume(m, handler)
+	})
+
+	t.Run("HandlerHandle_Error", func(t *testing.T) {
+		svc := &mockService{
+			deleteMessage: func(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
+				return &sqs.DeleteMessageOutput{}, nil
+			},
+		}
+		c := &consumer{svc: svc}
+		m := &sqs.Message{
+			Body: aws.String(string("test")),
+		}
+		handler := &mockHandler{
+			handle: func(message *sqs.Message, deadline ExtendDeadline) error {
+				return errors.New("handle_error")
+			},
+			error: func(message *sqs.Message, b bool, e error) {
+				assert.EqualError(t, e, "handle_error")
+			},
+		}
+		c.consume(m, handler)
+	})
+
+	t.Run("DeleteMessage_Error", func(t *testing.T) {
+		svc := &mockService{
+			deleteMessage: func(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
+				return nil, errors.New("handle_error")
+			},
+		}
+		c := &consumer{svc: svc}
+		m := &sqs.Message{
+			Body: aws.String(string("test")),
+		}
+		handler := &mockHandler{
+			handle: func(message *sqs.Message, deadline ExtendDeadline) error {
+				return nil
+			},
+			error: func(message *sqs.Message, b bool, e error) {
+				assert.EqualError(t, e, "handle_error")
+			},
+		}
+		c.consume(m, handler)
+	})
+}
+
+func TestConsumer_extendDeadline(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		svc := &mockService{
+			changeMessageVisibility: func(input *sqs.ChangeMessageVisibilityInput) (*sqs.ChangeMessageVisibilityOutput, error) {
+				assert.Equal(t, "abcd", aws.StringValue(input.ReceiptHandle))
+				assert.Equal(t, int64(time.Minute.Seconds()), aws.Int64Value(input.VisibilityTimeout))
+				return nil, nil
+			},
+		}
+		c := &consumer{svc: svc}
+		m := &sqs.Message{
+			MessageId: aws.String("m_1"),
+			Body:      aws.String(string("test")),
+		}
+		c.extendDeadline(m, "abcd", time.Minute)
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		svc := &mockService{
+			changeMessageVisibility: func(input *sqs.ChangeMessageVisibilityInput) (*sqs.ChangeMessageVisibilityOutput, error) {
+				assert.Equal(t, "abcd", aws.StringValue(input.ReceiptHandle))
+				assert.Equal(t, int64(time.Minute.Seconds()), aws.Int64Value(input.VisibilityTimeout))
+				return nil, errors.New("error")
+			},
+		}
+		c := &consumer{svc: svc}
+		m := &sqs.Message{
+			MessageId: aws.String("m_1"),
+			Body:      aws.String(string("test")),
+		}
+		err := c.extendDeadline(m, "abcd", time.Minute)
+		assert.EqualError(t, err, "sqsx: could not extend deadline for message \"m_1\"\n\terror")
+	})
 }

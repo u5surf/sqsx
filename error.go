@@ -25,7 +25,7 @@ func (e Error) Error() string {
 	if e.cause == nil {
 		return fmt.Sprintf("sqsx: %s", e.msg)
 	}
-	return fmt.Sprintf("sqsx: %s\nby:%v", e.msg, e.cause)
+	return fmt.Sprintf("sqsx: %s\n\t%v", e.msg, e.cause)
 }
 
 func errorf(cause error, msg string, args ...interface{}) error {

@@ -32,13 +32,13 @@ type Publisher interface {
 	Publish(msg interface{}, config ...*MessageConfig) error
 }
 
-type Message struct {
+type MessageWrapper struct {
 	Data interface{} `json:"data"`
 }
 
 type envelope struct {
 	id     string
-	m      Message
+	m      MessageWrapper
 	status chan error
 	delay  time.Duration
 }
@@ -145,7 +145,7 @@ func (p publisher) Publish(msg interface{}, config ...*MessageConfig) error {
 	if msg == nil {
 		return ErrInvalidMessage
 	}
-	m := Message{Data: msg}
+	m := MessageWrapper{Data: msg}
 	e := envelope{id: uuid.NewV4().String(), m: m, status: make(chan error)}
 	for _, c := range config {
 		if c == nil {
