@@ -4,7 +4,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/sqs"
-	"log"
 	"sync/atomic"
 	"time"
 )
@@ -47,7 +46,6 @@ func (c consumer) Start(handler interface{}) error {
 			if maxMessages == 0 {
 				continue
 			}
-			log.Println(maxMessages)
 			if SQSMaxBatchSize < maxMessages {
 				maxMessages = SQSMaxBatchSize
 			}
@@ -67,6 +65,7 @@ func (c consumer) Start(handler interface{}) error {
 			for _, m := range result.Messages {
 				atomic.AddInt32(&free, -1)
 				go func(m *sqs.Message) {
+					// TODO: consume
 					c.consumeFn(m, handler)
 					atomic.AddInt32(&free, 1)
 				}(m)
