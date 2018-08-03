@@ -36,7 +36,7 @@ type consumer struct {
 	extendDeadlineFn ExtendDeadline
 }
 
-func (c consumer) Start(handler ConsumeHandler) error {
+func (c *consumer) Start(handler ConsumeHandler) error {
 	var stopped chan bool
 	free := int32(c.config.MaxWorkers)
 
@@ -81,7 +81,7 @@ func (c consumer) Start(handler ConsumeHandler) error {
 	}
 }
 
-func (c consumer) consume(m *sqs.Message, handler ConsumeHandler) {
+func (c *consumer) consume(m *sqs.Message, handler ConsumeHandler) {
 	// Handle message
 	if err := handler.Handle(m, c.extendDeadlineFn); err != nil {
 		handler.Error(m, false, err)
@@ -101,7 +101,7 @@ func (c consumer) consume(m *sqs.Message, handler ConsumeHandler) {
 	}
 }
 
-func (c consumer) extendDeadline(message *sqs.Message, timeout time.Duration) error {
+func (c *consumer) extendDeadline(message *sqs.Message, timeout time.Duration) error {
 	inp := &sqs.ChangeMessageVisibilityInput{
 		ReceiptHandle:     message.ReceiptHandle,
 		QueueUrl:          aws.String(c.queueURL),
@@ -114,7 +114,7 @@ func (c consumer) extendDeadline(message *sqs.Message, timeout time.Duration) er
 	return nil
 }
 
-func (c consumer) Stop() {
+func (c *consumer) Stop() {
 	done := make(chan bool)
 	c.stop <- done
 	<-done
