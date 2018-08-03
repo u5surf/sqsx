@@ -101,6 +101,7 @@ func TestConsumer_Start(t *testing.T) {
 		recvCount := 0
 		svc := &mockService{}
 		svc.receiveMessage = func(input *sqs.ReceiveMessageInput) (*sqs.ReceiveMessageOutput, error) {
+			assert.Equal(t, int64((time.Minute * 3).Seconds()), aws.Int64Value(input.VisibilityTimeout))
 			if recvCount == 0 {
 				recvCount++
 				return &sqs.ReceiveMessageOutput{
@@ -115,7 +116,7 @@ func TestConsumer_Start(t *testing.T) {
 			return &sqs.ReceiveMessageOutput{Messages: []*sqs.Message{}}, nil
 		}
 		consumeCount := 0
-		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{PollTimeout: pollTimeout})
+		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{PollTimeout: pollTimeout, Timeout: time.Minute * 3})
 		con.(*consumer).consumeFn = func(m *sqs.Message, handler ConsumeHandler) {
 			consumeCount++
 		}

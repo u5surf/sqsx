@@ -64,7 +64,7 @@ func (c *consumer) Start(handler ConsumeHandler) error {
 				QueueUrl:            aws.String(c.queueURL),
 				MaxNumberOfMessages: aws.Int64(int64(maxMessages)),
 				WaitTimeSeconds:     aws.Int64(int64(c.config.PollTimeout.Seconds())),
-				VisibilityTimeout:   aws.Int64(int64(c.config.Timeout)),
+				VisibilityTimeout:   aws.Int64(int64(c.config.Timeout.Seconds())),
 			})
 			if err != nil {
 				return errorf(err, "unable to receive message(s) from queue %q", c.queueName)
