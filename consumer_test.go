@@ -455,10 +455,11 @@ func TestConsumer_extendDeadline(t *testing.T) {
 		}
 		c := &consumer{svc: svc}
 		m := &sqs.Message{
-			MessageId: aws.String("m_1"),
-			Body:      aws.String(string("test")),
+			MessageId:     aws.String("m_1"),
+			Body:          aws.String(string("test")),
+			ReceiptHandle: aws.String("abcd"),
 		}
-		c.extendDeadline(m, "abcd", time.Minute)
+		c.extendDeadline(m, time.Minute)
 	})
 
 	t.Run("Error", func(t *testing.T) {
@@ -471,10 +472,11 @@ func TestConsumer_extendDeadline(t *testing.T) {
 		}
 		c := &consumer{svc: svc}
 		m := &sqs.Message{
-			MessageId: aws.String("m_1"),
-			Body:      aws.String(string("test")),
+			MessageId:     aws.String("m_1"),
+			Body:          aws.String(string("test")),
+			ReceiptHandle: aws.String("abcd"),
 		}
-		err := c.extendDeadline(m, "abcd", time.Minute)
+		err := c.extendDeadline(m, time.Minute)
 		assert.EqualError(t, err, "sqsx: could not extend deadline for message \"m_1\"\n\terror")
 	})
 }

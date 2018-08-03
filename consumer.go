@@ -13,7 +13,7 @@ type ConsumeHandler interface {
 	Error(message *sqs.Message, ok bool, err error)
 }
 
-type ExtendDeadline func(message *sqs.Message, receiptHandle string, timeout time.Duration) error
+type ExtendDeadline func(message *sqs.Message, timeout time.Duration) error
 
 type ConsumerConfig struct {
 	MaxWorkers int
@@ -101,9 +101,9 @@ func (c consumer) consume(m *sqs.Message, handler ConsumeHandler) {
 	}
 }
 
-func (c consumer) extendDeadline(message *sqs.Message, receiptHandle string, timeout time.Duration) error {
+func (c consumer) extendDeadline(message *sqs.Message, timeout time.Duration) error {
 	inp := &sqs.ChangeMessageVisibilityInput{
-		ReceiptHandle:     aws.String(receiptHandle),
+		ReceiptHandle:     message.ReceiptHandle,
 		QueueUrl:          aws.String(c.queueURL),
 		VisibilityTimeout: aws.Int64(int64(timeout.Seconds())),
 	}
