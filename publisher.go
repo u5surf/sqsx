@@ -92,7 +92,6 @@ func (p publisher) publishBatch(ee []*envelope) {
 		envMap map[string]*envelope
 	)
 
-	batchID := uuid.Must(uuid.NewV4()).String()
 	envMap = make(map[string]*envelope)
 	for _, e := range ee {
 		b, err := p.jsonMarshalFn(e.body)
@@ -102,10 +101,9 @@ func (p publisher) publishBatch(ee []*envelope) {
 			continue
 		}
 		be := &sqs.SendMessageBatchRequestEntry{
-			Id:             aws.String(e.id),
-			MessageGroupId: aws.String(batchID),
-			DelaySeconds:   aws.Int64(int64(e.delay.Seconds())),
-			MessageBody:    aws.String(string(b)),
+			Id:           aws.String(e.id),
+			DelaySeconds: aws.Int64(int64(e.delay.Seconds())),
+			MessageBody:  aws.String(string(b)),
 		}
 		bee = append(bee, be)
 
