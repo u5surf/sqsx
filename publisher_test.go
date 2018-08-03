@@ -182,7 +182,7 @@ func TestPubImpl_Start(t *testing.T) {
 		}
 		go impl.Start()
 		for i := 0; i < 10; i++ {
-			impl.outbox <- envelope{m: MessageWrapper{Data: fmt.Sprintf("m_%d", i)}, status: make(chan error)}
+			impl.outbox <- envelope{body: fmt.Sprintf("m_%d", i), status: make(chan error)}
 		}
 		<-done
 	})
@@ -208,7 +208,7 @@ func TestPubImpl_Start(t *testing.T) {
 		}
 		go impl.Start()
 		for i := 0; i < 3; i++ {
-			impl.outbox <- envelope{m: MessageWrapper{Data: fmt.Sprintf("m_%d", i)}, status: make(chan error)}
+			impl.outbox <- envelope{body: fmt.Sprintf("m_%d", i), status: make(chan error)}
 		}
 		<-done
 	})
@@ -232,7 +232,7 @@ func TestPubImpl_Start(t *testing.T) {
 		}
 		go impl.Start()
 		for i := 0; i < 5; i++ {
-			impl.outbox <- envelope{m: MessageWrapper{Data: fmt.Sprintf("m_%d", i)}, status: make(chan error)}
+			impl.outbox <- envelope{body: fmt.Sprintf("m_%d", i), status: make(chan error)}
 		}
 		done := make(chan bool)
 		impl.stop <- done
@@ -256,7 +256,7 @@ func TestPubImpl_Start(t *testing.T) {
 				assert.Len(t, input, 5)
 				go func() {
 					for i := 0; i < 3; i++ {
-						impl.outbox <- envelope{m: MessageWrapper{Data: fmt.Sprintf("m_%d", i)}, status: make(chan error)}
+						impl.outbox <- envelope{body: fmt.Sprintf("m_%d", i), status: make(chan error)}
 					}
 					<-time.NewTimer(time.Millisecond * 500).C
 					impl.stop <- done
@@ -272,7 +272,7 @@ func TestPubImpl_Start(t *testing.T) {
 		}
 		go impl.Start()
 		for i := 0; i < 15; i++ {
-			impl.outbox <- envelope{m: MessageWrapper{Data: fmt.Sprintf("m_%d", i)}, status: make(chan error)}
+			impl.outbox <- envelope{body: fmt.Sprintf("m_%d", i), status: make(chan error)}
 		}
 		<-done
 	})
@@ -301,8 +301,8 @@ func TestPubImpl_Publish(t *testing.T) {
 		}()
 		e := <-impl.outbox
 		assert.NotEmpty(t, e.id)
-		if assert.NotNil(t, e.m) {
-			assert.NotNil(t, e.m.Data)
+		if assert.NotNil(t, e.body) {
+			assert.NotNil(t, e.body)
 		}
 		assert.NotNil(t, e.status)
 		assert.Equal(t, e.delay, time.Second)
@@ -369,17 +369,17 @@ func TestPubImpl_publishBatch(t *testing.T) {
 			{
 				id:     "cb561661-1848-4512-91e8-68d2d3bee943",
 				status: make(chan error),
-				m:      MessageWrapper{Data: "m1"},
+				body:   "m1",
 			},
 			{
 				id:     "74863f40-a07a-475d-bbdc-9ea4f7404adf",
 				status: make(chan error),
-				m:      MessageWrapper{Data: "m2"},
+				body:   "m2",
 			},
 			{
 				id:     "51759766-5328-4acf-beac-5da1cebab966",
 				status: make(chan error),
-				m:      MessageWrapper{Data: "m3"},
+				body:   "m3",
 			},
 		}
 		go p.(*publisher).publishBatch(ee)
@@ -412,17 +412,17 @@ func TestPubImpl_publishBatch(t *testing.T) {
 			{
 				id:     "cb561661-1848-4512-91e8-68d2d3bee943",
 				status: make(chan error),
-				m:      MessageWrapper{Data: "m1"},
+				body:   "m1",
 			},
 			{
 				id:     "74863f40-a07a-475d-bbdc-9ea4f7404adf",
 				status: make(chan error),
-				m:      MessageWrapper{Data: "m2"},
+				body:   "m2",
 			},
 			{
 				id:     "51759766-5328-4acf-beac-5da1cebab966",
 				status: make(chan error),
-				m:      MessageWrapper{Data: "m3"},
+				body:   "m3",
 			},
 		}
 		go p.(*publisher).publishBatch(ee)
@@ -456,17 +456,17 @@ func TestPubImpl_publishBatch(t *testing.T) {
 			{
 				id:     "cb561661-1848-4512-91e8-68d2d3bee943",
 				status: make(chan error),
-				m:      MessageWrapper{Data: "m1"},
+				body:   "m1",
 			},
 			{
 				id:     "74863f40-a07a-475d-bbdc-9ea4f7404adf",
 				status: make(chan error),
-				m:      MessageWrapper{Data: "m2"},
+				body:   "m2",
 			},
 			{
 				id:     "51759766-5328-4acf-beac-5da1cebab966",
 				status: make(chan error),
-				m:      MessageWrapper{Data: "m3"},
+				body:   "m3",
 			},
 		}
 		impl := p.(*publisher)

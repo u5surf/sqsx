@@ -32,13 +32,9 @@ type Publisher interface {
 	Publish(msg interface{}, config ...*MessageConfig) error
 }
 
-type MessageWrapper struct {
-	Data interface{} `json:"data"`
-}
-
 type envelope struct {
 	id     string
-	m      MessageWrapper
+	body   interface{}
 	status chan error
 	delay  time.Duration
 }
@@ -99,7 +95,7 @@ func (p publisher) publishBatch(ee []*envelope) {
 	batchID := uuid.NewV4().String()
 	envMap = make(map[string]*envelope)
 	for _, e := range ee {
-		b, err := p.jsonMarshalFn(e.m)
+		b, err := p.jsonMarshalFn(e.body)
 		if err != nil {
 			// This is unlikely to happen, here in case it does.
 			e.status <- errorf(err, "could not publish message")
@@ -145,8 +141,7 @@ func (p publisher) Publish(msg interface{}, config ...*MessageConfig) error {
 	if msg == nil {
 		return ErrInvalidMessage
 	}
-	m := MessageWrapper{Data: msg}
-	e := envelope{id: uuid.NewV4().String(), m: m, status: make(chan error)}
+	e := envelope{id: uuid.NewV4().String(), body: msg, status: make(chan error)}
 	for _, c := range config {
 		if c == nil {
 			continue
