@@ -92,7 +92,7 @@ func (p publisher) publishBatch(ee []*envelope) {
 		envMap map[string]*envelope
 	)
 
-	batchID := uuid.NewV4().String()
+	batchID := uuid.Must(uuid.NewV4()).String()
 	envMap = make(map[string]*envelope)
 	for _, e := range ee {
 		b, err := p.jsonMarshalFn(e.body)
@@ -141,7 +141,7 @@ func (p publisher) Publish(msg interface{}, config ...*MessageConfig) error {
 	if msg == nil {
 		return ErrInvalidMessage
 	}
-	e := envelope{id: uuid.NewV4().String(), body: msg, status: make(chan error)}
+	e := envelope{id: uuid.Must(uuid.NewV4()).String(), body: msg, status: make(chan error)}
 	for _, c := range config {
 		if c == nil {
 			continue
