@@ -12,11 +12,11 @@ import (
 )
 
 type mockHandler struct {
-	handle func(message *sqs.Message, deadline ExtendDeadline) error
+	handle func(message *sqs.Message, deadline ExtendTimeout) error
 	error  func(*sqs.Message, bool, error)
 }
 
-func (m *mockHandler) Handle(message *sqs.Message, deadline ExtendDeadline) error {
+func (m *mockHandler) Handle(message *sqs.Message, deadline ExtendTimeout) error {
 	if m.handle != nil {
 		return m.handle(message, deadline)
 	}
@@ -41,7 +41,7 @@ func TestNewConsumer(t *testing.T) {
 			assert.NotNil(t, impl.svc)
 			assert.NotNil(t, impl.svc)
 			assert.NotNil(t, impl.consumeFn)
-			assert.NotNil(t, impl.extendDeadlineFn)
+			assert.NotNil(t, impl.extendTimeoutFn)
 			if assert.NotNil(t, impl.config) {
 				assert.Equal(t, SQSMaxPollTimeout, impl.config.PollTimeout)
 			}
@@ -391,7 +391,7 @@ func TestConsumer_consume(t *testing.T) {
 			Body: aws.String(string("test")),
 		}
 		handler := &mockHandler{
-			handle: func(message *sqs.Message, deadline ExtendDeadline) error {
+			handle: func(message *sqs.Message, deadline ExtendTimeout) error {
 				return nil
 			},
 			error: func(message *sqs.Message, b bool, e error) {
@@ -412,7 +412,7 @@ func TestConsumer_consume(t *testing.T) {
 			Body: aws.String(string("test")),
 		}
 		handler := &mockHandler{
-			handle: func(message *sqs.Message, deadline ExtendDeadline) error {
+			handle: func(message *sqs.Message, deadline ExtendTimeout) error {
 				return errors.New("handle_error")
 			},
 			error: func(message *sqs.Message, b bool, e error) {
@@ -433,7 +433,7 @@ func TestConsumer_consume(t *testing.T) {
 			Body: aws.String(string("test")),
 		}
 		handler := &mockHandler{
-			handle: func(message *sqs.Message, deadline ExtendDeadline) error {
+			handle: func(message *sqs.Message, deadline ExtendTimeout) error {
 				return nil
 			},
 			error: func(message *sqs.Message, b bool, e error) {
@@ -459,7 +459,7 @@ func TestConsumer_extendDeadline(t *testing.T) {
 			Body:          aws.String(string("test")),
 			ReceiptHandle: aws.String("abcd"),
 		}
-		c.extendDeadline(m, time.Minute)
+		c.extendTimeout(m, time.Minute)
 	})
 
 	t.Run("Error", func(t *testing.T) {
@@ -476,7 +476,7 @@ func TestConsumer_extendDeadline(t *testing.T) {
 			Body:          aws.String(string("test")),
 			ReceiptHandle: aws.String("abcd"),
 		}
-		err := c.extendDeadline(m, time.Minute)
+		err := c.extendTimeout(m, time.Minute)
 		assert.EqualError(t, err, "sqsx: could not extend deadline for message \"m_1\"\n\terror")
 	})
 }

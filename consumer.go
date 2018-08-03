@@ -9,16 +9,18 @@ import (
 )
 
 type ConsumeHandler interface {
-	Handle(message *sqs.Message, deadline ExtendDeadline) error
+	Handle(message *sqs.Message, deadline ExtendTimeout) error
 	Error(message *sqs.Message, ok bool, err error)
 }
 
-type ExtendDeadline func(message *sqs.Message, timeout time.Duration) error
+type ExtendTimeout func(message *sqs.Message, timeout time.Duration) error
 
 type ConsumerConfig struct {
 	MaxWorkers int
 
 	PollTimeout time.Duration
+
+	Timeout time.Duration
 }
 
 type Consumer interface {
@@ -32,8 +34,8 @@ type consumer struct {
 	svc                 Service
 	stop                chan chan bool
 
-	consumeFn        func(m *sqs.Message, handler ConsumeHandler)
-	extendDeadlineFn ExtendDeadline
+	consumeFn       func(m *sqs.Message, handler ConsumeHandler)
+	extendTimeoutFn ExtendTimeout
 }
 
 func (c *consumer) Start(handler ConsumeHandler) error {
@@ -62,6 +64,7 @@ func (c *consumer) Start(handler ConsumeHandler) error {
 				QueueUrl:            aws.String(c.queueURL),
 				MaxNumberOfMessages: aws.Int64(int64(maxMessages)),
 				WaitTimeSeconds:     aws.Int64(int64(c.config.PollTimeout.Seconds())),
+				VisibilityTimeout:   aws.Int64(int64(c.config.Timeout)),
 			})
 			if err != nil {
 				return errorf(err, "unable to receive message(s) from queue %q", c.queueName)
@@ -83,7 +86,7 @@ func (c *consumer) Start(handler ConsumeHandler) error {
 
 func (c *consumer) consume(m *sqs.Message, handler ConsumeHandler) {
 	// Handle message
-	if err := handler.Handle(m, c.extendDeadlineFn); err != nil {
+	if err := handler.Handle(m, c.extendTimeoutFn); err != nil {
 		handler.Error(m, false, err)
 		return
 	}
@@ -101,7 +104,7 @@ func (c *consumer) consume(m *sqs.Message, handler ConsumeHandler) {
 	}
 }
 
-func (c *consumer) extendDeadline(message *sqs.Message, timeout time.Duration) error {
+func (c *consumer) extendTimeout(message *sqs.Message, timeout time.Duration) error {
 	inp := &sqs.ChangeMessageVisibilityInput{
 		ReceiptHandle:     message.ReceiptHandle,
 		QueueUrl:          aws.String(c.queueURL),
@@ -149,8 +152,9 @@ func NewConsumer(queueName string, svc Service, config ...*ConsumerConfig) (Cons
 		if cfg.MaxWorkers > 0 {
 			c.config.MaxWorkers = cfg.MaxWorkers
 		}
+		c.config.Timeout = cfg.Timeout
 	}
 	c.consumeFn = c.consume
-	c.extendDeadlineFn = c.extendDeadline
+	c.extendTimeoutFn = c.extendTimeout
 	return c, nil
 }
