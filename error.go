@@ -4,10 +4,6 @@ import (
 	"fmt"
 )
 
-type causer interface {
-	Cause() error
-}
-
 type Error struct {
 	cause error
 	msg   string
@@ -28,7 +24,7 @@ func (e Error) Error() string {
 	return fmt.Sprintf("sqsx: %s\n\t%v", e.msg, e.cause)
 }
 
-func errorf(cause error, msg string, args ...interface{}) error {
+func NewErr(cause error, msg string, args ...interface{}) error {
 	return &Error{
 		cause: cause,
 		msg:   fmt.Sprintf(msg, args...),

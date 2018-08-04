@@ -97,7 +97,7 @@ func (p publisher) publishBatch(ee []*envelope) {
 		b, err := p.jsonMarshalFn(e.body)
 		if err != nil {
 			// This is unlikely to happen, here in case it does.
-			e.status <- errorf(err, "could not publish message")
+			e.status <- NewErr(err, "could not publish message")
 			continue
 		}
 		be := &sqs.SendMessageBatchRequestEntry{
@@ -118,7 +118,7 @@ func (p publisher) publishBatch(ee []*envelope) {
 	resp, err := p.svc.SendMessageBatch(&sqs.SendMessageBatchInput{QueueUrl: aws.String(p.queueURL), Entries: bee})
 	if err != nil {
 		for _, en := range bee {
-			envMap[aws.StringValue(en.Id)].status <- errorf(err, "could not publish message")
+			envMap[aws.StringValue(en.Id)].status <- NewErr(err, "could not publish message")
 		}
 		return
 	}
@@ -131,7 +131,7 @@ func (p publisher) publishBatch(ee []*envelope) {
 	// Relay failure results back
 	for _, f := range resp.Failed {
 		en := envMap[aws.StringValue(f.Id)]
-		en.status <- errorf(nil, "could not publish message\nMessage=%q\nCode=%q", aws.StringValue(f.Message), aws.StringValue(f.Code))
+		en.status <- NewErr(nil, "could not publish message\nMessage=%q\nCode=%q", aws.StringValue(f.Message), aws.StringValue(f.Code))
 	}
 }
 
@@ -159,7 +159,7 @@ func NewPublisher(queueName string, svc Service, config ...*PublisherConfig) (Pu
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == sqs.ErrCodeQueueDoesNotExist {
 			return nil, ErrQueueDoesNotExist
 		}
-		return nil, errorf(err, "could not get outbox URL")
+		return nil, NewErr(err, "could not get queue URL")
 	}
 
 	p := &publisher{

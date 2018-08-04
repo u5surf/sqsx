@@ -67,7 +67,7 @@ func (c *consumer) Start(handler ConsumeHandler) error {
 				VisibilityTimeout:   aws.Int64(int64(c.config.Timeout.Seconds())),
 			})
 			if err != nil {
-				return errorf(err, "unable to receive message(s) from queue %q", c.queueName)
+				return NewErr(err, "unable to receive message(s) from queue %q", c.queueName)
 			}
 
 			if len(result.Messages) <= 0 {
@@ -112,7 +112,7 @@ func (c *consumer) extendTimeout(message *sqs.Message, timeout time.Duration) er
 	}
 	_, err := c.svc.ChangeMessageVisibility(inp)
 	if err != nil {
-		return errorf(err, "could not extend deadline for message %q", aws.StringValue(message.MessageId))
+		return NewErr(err, "could not extend deadline for message %q", aws.StringValue(message.MessageId))
 	}
 	return nil
 }
@@ -132,7 +132,7 @@ func NewConsumer(queueName string, svc Service, config ...*ConsumerConfig) (Cons
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == sqs.ErrCodeQueueDoesNotExist {
 			return nil, ErrQueueDoesNotExist
 		}
-		return nil, errorf(err, "could not get outbox URL")
+		return nil, NewErr(err, "could not get outbox URL")
 	}
 
 	c := &consumer{
