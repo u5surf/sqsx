@@ -43,7 +43,7 @@ func (j *consumeJobHandler) Handle(message *sqs.Message, deadline sqsx.ExtendTim
 		select {
 		case <-t.C:
 			log.Info().Str("messageID", aws.StringValue(message.MessageId)).Msg("Extending timeout.")
-			if err := deadline(message, j.DeadlineTimeout ); err != nil {
+			if err := deadline(message, j.DeadlineTimeout); err != nil {
 				log.Error().Err(err).
 					Str("messageID", aws.StringValue(message.MessageId)).
 					Msg("could not extend message timeout")
@@ -55,7 +55,7 @@ func (j *consumeJobHandler) Handle(message *sqs.Message, deadline sqsx.ExtendTim
 }
 ```
 
-## Create consumer and publisher
+## Helpers for creating a consumer and publisher
 ```go
 type QueueConfig struct {
 	Name            string
@@ -96,7 +96,7 @@ func sqsPublisherFromConfig(config QueueConfig) (sqsx.Publisher, error) {
 	return p, nil
 }
 ```
-## Start consumer and publisher
+## Start the consumer and publisher
 ```go
 func main() {
 	// Consumer
@@ -135,6 +135,7 @@ func main() {
 		jobCompletionPublisher.Start()
 	}()
 
+	// Graceful stops
 	stopQueues(jobConsumer, jobCompletionPublisher)
 }
 
