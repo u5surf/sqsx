@@ -1,7 +1,7 @@
 # sqsx
 A library that makes consuming and publishing with SQS easier.
 
-```
+```go
 type QueueConfig struct {
 	Name            string
 	AccountID       string
