@@ -1,6 +1,7 @@
 # sqsx
 A library that makes consuming and publishing with SQS easier.
 
+## Creating instances of consumer and publisher
 ```go
 type QueueConfig struct {
 	Name            string
@@ -27,7 +28,7 @@ func sqsConsumerFromConfig(config QueueConfig) (sqsx.Consumer, error) {
 	return c, nil
 }
 
-func sqsProducerFromConfig(config QueueConfig) (sqsx.Publisher, error) {
+func sqsPublisherFromConfig(config QueueConfig) (sqsx.Publisher, error) {
 	awsConfig := aws.NewConfig().
 		WithRegion(config.Region).
 		WithCredentials(credentials.NewStaticCredentials(config.AccessKeyID, config.AccessKeySecret, ""))
