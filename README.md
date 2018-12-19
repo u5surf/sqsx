@@ -41,3 +41,52 @@ func sqsProducerFromConfig(config QueueConfig) (sqsx.Publisher, error) {
 	return p, nil
 }
 ```
+## Consume a message from SQS
+```go
+type Job struct {
+	// Define fields
+}
+
+func performJob(job *Job) error {
+	// Perform job here
+	return nil
+}
+
+type consumeJobHandler struct {
+	DeadlineTimeout time.Duration
+}
+
+func (j *consumeJobHandler) Error(message *sqs.Message, ok bool, err error) {
+	log.Error().Err(err).Bool("success", ok).
+		Str("messageID", aws.StringValue(message.MessageId)).
+		Interface("message", message).Msg("Error processing message")
+}
+
+func (j *consumeJobHandler) Handle(message *sqs.Message, deadline sqsx.ExtendTimeout) error {
+	done := make(chan error)
+	go func(resp chan<- error) {
+		var job Job
+		err := json.Unmarshal([]byte(aws.StringValue(message.Body)), &job)
+		if err != nil {
+			resp <- fmt.Errorf("could not unmarshal message body:\n%v", err)
+		}
+		resp <- performJob(&job)
+	}(done)
+
+	// Extend sqs timeout for the message.
+	t := time.NewTicker(j.DeadlineTimeout - (time.Second * 10))
+	for {
+		select {
+		case <-t.C:
+			log.Info().Str("messageID", aws.StringValue(message.MessageId)).Msg("Extending timeout.")
+			if err := deadline(message, j.DeadlineTimeout ); err != nil {
+				log.Error().Err(err).
+					Str("messageID", aws.StringValue(message.MessageId)).
+					Msg("could not extend message timeout")
+			}
+		case err := <-done:
+			return err
+		}
+	}
+}
+```
