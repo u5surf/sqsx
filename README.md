@@ -1,4 +1,4 @@
-# sqsx
+# sqsx ![Build](https://travis-ci.org/sharonjl/sqsx.svg?branch=master)
 A library that makes consuming and publishing with SQS easier.
 
 ## Your job struct and function
