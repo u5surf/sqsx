@@ -2,13 +2,14 @@ package sqsx
 
 import (
 	"errors"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/stretchr/testify/assert"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 type mockHandler struct {
@@ -116,12 +117,22 @@ func TestConsumer_Start(t *testing.T) {
 			return &sqs.ReceiveMessageOutput{Messages: []*sqs.Message{}}, nil
 		}
 		consumeCount := 0
+		ch := make(chan int)
 		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{PollTimeout: pollTimeout, Timeout: time.Minute * 3})
 		con.(*consumer).consumeFn = func(m *sqs.Message, handler ConsumeHandler) {
-			consumeCount++
+			ch <- 1
 		}
 		go con.Start(nil)
-		<-time.NewTimer(time.Second).C
+		timeChan := time.NewTimer(time.Second).C
+	L:
+		for {
+			select {
+			case <-timeChan:
+				break L
+			case v, _ := <-ch:
+				consumeCount += v
+			}
+		}
 		assert.Equal(t, 1, consumeCount)
 		con.Stop()
 	})
@@ -144,12 +155,22 @@ func TestConsumer_Start(t *testing.T) {
 			return &sqs.ReceiveMessageOutput{Messages: []*sqs.Message{}}, nil
 		}
 		consumeCount := 0
+		ch := make(chan int)
 		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{PollTimeout: pollTimeout})
 		con.(*consumer).consumeFn = func(m *sqs.Message, handler ConsumeHandler) {
-			consumeCount++
+			ch <- 1
 		}
 		go con.Start(nil)
-		<-time.NewTimer(time.Second).C
+		timeChan := time.NewTimer(time.Second).C
+	L:
+		for {
+			select {
+			case <-timeChan:
+				break L
+			case v, _ := <-ch:
+				consumeCount += v
+			}
+		}
 		assert.Equal(t, 3, consumeCount)
 		con.Stop()
 	})
@@ -193,6 +214,7 @@ func TestConsumer_Start(t *testing.T) {
 			}
 		}
 		consumeCount := int32(0)
+		ch := make(chan int)
 		con, _ := NewConsumer("QUEUE_NAME", svc, &ConsumerConfig{MaxWorkers: 2, PollTimeout: pollTimeout})
 		con.(*consumer).consumeFn = func(m *sqs.Message, handler ConsumeHandler) {
 			switch aws.StringValue(m.MessageId) {
@@ -203,10 +225,19 @@ func TestConsumer_Start(t *testing.T) {
 			case "msg_3":
 				<-time.NewTimer(time.Second).C
 			}
-			atomic.AddInt32(&consumeCount, 1)
+			ch <- 1
 		}
 		go con.Start(nil)
-		<-time.NewTimer(time.Second * 4).C
+		timeChan := time.NewTimer(time.Second * 4).C
+	L:
+		for {
+			select {
+			case <-timeChan:
+				break L
+			case v, _ := <-ch:
+				atomic.AddInt32(&consumeCount, int32(v))
+			}
+		}
 		assert.Equal(t, int32(3), consumeCount)
 		con.Stop()
 	})
